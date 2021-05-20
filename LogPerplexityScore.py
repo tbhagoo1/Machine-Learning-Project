@@ -58,21 +58,6 @@ lda = LatentDirichletAllocation(learning_method='online', learning_offset=10.0, 
 #according to Log Likelihood and and Model Perplexity
 model = GridSearchCV(lda, param_grid=search_params)
 model.fit(data_vectorized)
-
-#Note this uses params mentioned in
-#medium.com/@yanlinc/how-to-build-a-lda-topic-model-using-from-text-601cdcbfd3a6
-
-GridSearchCV(cv=None, error_score='raise',
-       estimator=LatentDirichletAllocation(batch_size=128, doc_topic_prior=None,
-             evaluate_every=-1, learning_decay=0.7, learning_method=None,
-             learning_offset=10.0, max_doc_update_iter=100, max_iter=10,
-             mean_change_tol=0.001, n_components=10, n_jobs=1,
-			perp_tol=0.1, random_state=None,
-             topic_word_prior=None, total_samples=1000000.0, verbose=0),
-       param_grid={'n_topics': [10, 15, 20, 25, 30], 'learning_decay': [.5, .6, .7, .8, .9]},
-       pre_dispatch='2*n_jobs', refit=True, return_train_score='warn',
-       scoring=None, verbose=0)
-
 best_lda_model = model.best_estimator_
 
 print("Best Model's Params: ", model.best_params_)
