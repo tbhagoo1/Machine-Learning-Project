@@ -7,12 +7,15 @@ from gensim.utils import simple_preprocess
 import nltk
 nltk.download('stopwords')
 from nltk.corpus import stopwords
-from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer, TfidfVectorizer
 from sklearn.decomposition import NMF
 from sklearn.preprocessing import normalize
+import numpy as np
+
+import matplotlib.pyplot as plt
 
 BASE_PATH = "archive"
-DATASET_TYPE = "food"
+DATASET_TYPE = "reviews"
 NUM_TOPICS = 9
 
 def get_files_to_read(directory_name):
@@ -38,7 +41,7 @@ def read_file(base_path, file_name, dataset_type):
     if dataset_type == "food":
         review_data = file_data[['Text']].copy()
     else:
-        review_data = file_data[['reviews_text']].copy()
+        review_data = file_data[['reviews.text']].copy()
     
     # add .sample(100) for testing
     print(review_data.head())
@@ -59,7 +62,7 @@ def prepare_text_regex(text_df, dataset_type):
     if dataset_type == "food":
         column_name = "Text"
     else:
-        column_name = "reviews_text"
+        column_name = "reviews.text"
 
     text_df[column_name] = \
     text_df[column_name].map(lambda x: re.sub('[,\.!?]', '', x))
@@ -97,21 +100,65 @@ def get_NMF_topics(model, vectorizer, top_word_num, num_topics):
     for i in range(num_topics):
         word_ids = model.components_[i].argsort()[:-top_word_num - 1:-1]
         words = [feature_names[key] for key in word_ids]
+        words = [re.sub('\S*@\S*\s?', '', word) for word in words]
         words = [re.sub('\s+', ' ', word) for word in words]
         words = [re.sub("\'", "", word) for word in words]
         top_words_dict[f'Topic #{i+1}'] = words
 
     nmf_df = pd.DataFrame(top_words_dict)
-    # nmf_df.to_csv("nmf_topics.csv")
+    nmf_df.to_csv("nmf_topics.csv")
     
     return nmf_df
+
+def get_nmf_weights_data(weights, features):
+    features = np.array(features)
+    sorted_indices = np.array([list(row[::-1]) for row in np.argsort(np.abs(weights))])
+    sorted_weights = np.array([list(wt[index]) for wt, index in zip(weights, sorted_indices)])
+    sorted_terms = np.array([list(features[row]) for row in sorted_indices])
+
+    topics = [np.vstack((terms.T, term_weights.T)).T for terms, term_weights in zip(sorted_terms, sorted_weights)]
+    # print("printing topics")
+    # print(topics)
+    return topics
+
+def plot_words(model, feature_names, num_top_words=10):
+    """Used to generate the topic plot after NMF processing
+
+    Args:
+        model (NMF): Scikit learn NMF model
+        feature_names : The features generated from the NMF model
+        num_top_words : Amount of top words for each topic (used 10 as default)
+    """
+    fig, axes = plt.subplots(3,3, figsize=(20,15), sharex=True)
+    axes = axes.flatten()
+
+    for topic_index, topic in enumerate(model.components_):
+        top_features_ind = topic.argsort()[:-num_top_words - 1:-1]
+        top_features = [feature_names[i] for i in top_features_ind]
+        weights = topic[top_features_ind]
+
+        ax = axes[topic_index]
+        ax.barh(top_features, weights, height=0.7)
+        ax.set_title(f'Topic #{topic_index +1}',
+                     fontdict={'fontsize': 25})
+        ax.invert_yaxis()
+        ax.tick_params(axis='both', which='major', labelsize=20)
+        for i in 'top right left'.split():
+            ax.spines[i].set_visible(False)
+        fig.suptitle("NMF Model Topics", fontsize=30)
+
+    plt.subplots_adjust(top=0.90, bottom=0.05, wspace=0.90, hspace=0.3)
+    # plt.show()
+
+    plt.savefig("nmf_model_topics.png")
+
 
 def main():
 
     # text_files = get_files_to_read(BASE_PATH)
 
-    df = read_file(BASE_PATH, "food.csv", "food")
-    processed_df = prepare_text_regex(df, "food")
+    df = read_file(BASE_PATH, "reviews.csv", "reviews")
+    processed_df = prepare_text_regex(df, "reviews")
 
     stop_words = stopwords.words('english')
     stop_words.extend(['from', 'subject', 're', 'edu', 'use', 'br'])
@@ -121,7 +168,7 @@ def main():
     if DATASET_TYPE == "food":
         data = processed_df["Text"].values.tolist()
     else:
-        data = processed_df["reviews_text"].values.tolist()
+        data = processed_df["reviews.text"].values.tolist()
 
     data_words = list(sent_to_words(data))# remove stop words
     data_words = remove_stopwords(data_words, stop_words)
@@ -148,19 +195,30 @@ def main():
     # print("printing articles sentences")
     # print(sentences)
 
-    vectorizer = CountVectorizer(analyzer='word', max_features=2000)
-    x = vectorizer.fit_transform(sentences)
+    # vectorizer = CountVectorizer(analyzer='word', max_features=2000)
+    # x = vectorizer.fit_transform(sentences)
 
-    transformer = TfidfTransformer()
-    x_tfid = transformer.fit_transform(x)
+    # transformer = TfidfTransformer()
+    # x_tfid = transformer.fit_transform(x)
 
-    x_tfid_norm = normalize(x_tfid, norm='l1', axis=1)
+    # x_tfid_norm = normalize(x_tfid, norm='l1', axis=1)
+
+    tf_vectorizer = TfidfVectorizer(analyzer="word", max_features=2000, stop_words="english")
+    x = tf_vectorizer.fit_transform(sentences)
 
     num_topics = NUM_TOPICS
     nmf_model = NMF(n_components=num_topics, init="nndsvd")
-    nmf_model.fit(x_tfid_norm)
+    nmf_model.fit(x)
 
-    get_NMF_topics(nmf_model, vectorizer, 20, num_topics)
+    nmf_features = tf_vectorizer.get_feature_names()
+    nmf_weights = nmf_model.components_
+    get_nmf_weights_data(nmf_weights, nmf_features)
+    plot_words(nmf_model, nmf_features, 10)
+
+    # print("printing _weights")
+    # print(nmf_model.components_)
+
+    
 
 
 if __name__ == "__main__":
