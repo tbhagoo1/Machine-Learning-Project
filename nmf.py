@@ -23,7 +23,7 @@ def get_files_to_read(directory_name):
     file_list = os.listdir(directory_name)
     return file_list
 
-def read_file(base_path, file_name, dataset_type):
+def read_file(base_path, dataset_type):
     """Returns df of specified review text from dataset
 
     Args:
@@ -33,15 +33,16 @@ def read_file(base_path, file_name, dataset_type):
 
     Returns:
         [pandas df]: Dataframe of review text
-    """
-
-    file_path = os.path.join(base_path, file_name)
-    file_data = pd.read_csv(file_path)    
+    """      
 
     if dataset_type == "food":
+        file_path = os.path.join(base_path, "food.csv")
+        file_data = pd.read_csv(file_path)  
         review_data = file_data[['Text']].copy()
     else:
-        review_data = file_data[['reviews.text']].copy()
+        file_path = os.path.join(base_path, "reviews.csv")
+        file_data = pd.read_csv(file_path)  
+        review_data = file_data[['reviews.text']].copy()    
     
     # add .sample(100) for testing
     print(review_data.head())
@@ -106,7 +107,7 @@ def get_NMF_topics(model, vectorizer, top_word_num, num_topics):
         top_words_dict[f'Topic #{i+1}'] = words
 
     nmf_df = pd.DataFrame(top_words_dict)
-    nmf_df.to_csv("nmf_topics.csv")
+    nmf_df.to_csv(f"nmf_{DATASET_TYPE}_topics.csv")
     
     return nmf_df
 
@@ -121,7 +122,7 @@ def get_nmf_weights_data(weights, features):
     # print(topics)
     return topics
 
-def plot_words(model, feature_names, num_top_words=10):
+def plot_words(model, feature_names, dataset_type, num_top_words=10):
     """Used to generate the topic plot after NMF processing
 
     Args:
@@ -145,20 +146,23 @@ def plot_words(model, feature_names, num_top_words=10):
         ax.tick_params(axis='both', which='major', labelsize=20)
         for i in 'top right left'.split():
             ax.spines[i].set_visible(False)
-        fig.suptitle("NMF Model Topics", fontsize=30)
+        if dataset_type == "food":
+            fig.suptitle("NMF Model Topics -- Food Dataset", fontsize=30)
+        else:
+            fig.suptitle("NMF Model Topics -- Product Review Dataset", fontsize=30)
 
     plt.subplots_adjust(top=0.90, bottom=0.05, wspace=0.90, hspace=0.3)
     # plt.show()
 
-    plt.savefig("nmf_model_topics.png")
+    plt.savefig(f"nmf_model_{dataset_type}_topics.png")
 
 
 def main():
 
     # text_files = get_files_to_read(BASE_PATH)
 
-    df = read_file(BASE_PATH, "reviews.csv", "reviews")
-    processed_df = prepare_text_regex(df, "reviews")
+    df = read_file(BASE_PATH, DATASET_TYPE)
+    processed_df = prepare_text_regex(df, DATASET_TYPE)
 
     stop_words = stopwords.words('english')
     stop_words.extend(['from', 'subject', 're', 'edu', 'use', 'br'])
@@ -179,12 +183,8 @@ def main():
     id2word = corpora.Dictionary(data_words)# Create Corpus
     # print("printing id2word")
     # print(id2word)
-    texts = data_words# Term Document Frequency
-    corpus = [id2word.doc2bow(text) for text in texts]# View
-    # print("printing corpus")
-    # print(corpus[0])
-    # print(len(corpus))
-    
+    texts = data_words
+    corpus = [id2word.doc2bow(text) for text in texts]
 
     # Can use this to test word count!
     # for i in range(len(corpus[0])):
@@ -212,8 +212,8 @@ def main():
 
     nmf_features = tf_vectorizer.get_feature_names()
     nmf_weights = nmf_model.components_
-    get_nmf_weights_data(nmf_weights, nmf_features)
-    plot_words(nmf_model, nmf_features, 10)
+    get_NMF_topics(nmf_model, tf_vectorizer, 10, 9)
+    plot_words(nmf_model, nmf_features, DATASET_TYPE, 10)
 
     # print("printing _weights")
     # print(nmf_model.components_)
