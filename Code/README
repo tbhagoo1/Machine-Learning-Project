@@ -1,0 +1,15 @@
+Project Name : Latent Dirichlet Allocation(LDA) and Non Negative Matrix Factorization (NMF) for Topic Modeling
+
+Team Members :  Teresa Chu (B00690148) 
+            	Trupti Bhagoorkar (B00820305)
+            	Joseph E Rivas (B00358083)
+
+Dataset Files:
+	https://www.kaggle.com/datafiniti/consumer-reviews-of-amazon-products
+	https://www.kaggle.com/snap/amazon-fine-food-reviews
+
+Execution Steps : 
+
+1. Open main.ipynb in jupyterhub. 
+2. Download and keep dataset files along with the code file.
+3. From the first block run the code one by one using run button.
